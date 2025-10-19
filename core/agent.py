@@ -1,14 +1,11 @@
-# core/agent.py
 import os
 from dotenv import load_dotenv
 from langchain.agents import AgentExecutor
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_groq import ChatGroq
 
-# Impor tools
 from core.tools import get_readme_content, get_repository_structure, analyze_dependencies
 
-# Impor komponen yang dibutuhkan untuk merakit agent
 from langchain.agents.output_parsers.react_single_input import ReActSingleInputOutputParser
 from langchain.agents.format_scratchpad import format_log_to_messages
 from langchain.tools.render import render_text_description
@@ -27,7 +24,6 @@ def create_agent_executor(memory):
 
     tools = [get_readme_content, get_repository_structure, analyze_dependencies]
 
-    # Prompt sekarang memiliki placeholder baru untuk riwayat obrolan
     template = """
 **MISSION:** You are Git-Cortex, a helpful assistant that analyzes GitHub repositories. Your job is to answer the user's question using the tools provided. You have access to the conversation history.
 
@@ -44,7 +40,6 @@ def create_agent_executor(memory):
 **BEGIN!**
 """
     
-    # Menggunakan ChatPromptTemplate untuk mengakomodasi riwayat pesan
     prompt = ChatPromptTemplate.from_messages([
         ("system", template),
         MessagesPlaceholder(variable_name="chat_history"),
@@ -63,11 +58,10 @@ def create_agent_executor(memory):
         | ReActSingleInputOutputParser()
     )
 
-    # Agent Executor sekarang diinisialisasi dengan memori
     agent_executor = AgentExecutor(
         agent=agent,
         tools=tools,
-        memory=memory, # <-- Memori diintegrasikan di sini
+        memory=memory,
         verbose=True,
         handle_parsing_errors="Your output was not formatted correctly. Please re-read the CRITICAL RULES and format your response exactly as specified.",
         max_iterations=7
