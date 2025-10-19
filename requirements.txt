@@ -1,0 +1,9 @@
+discord.py
+python-dotenv
+langchain
+langchain-groq
+langchain-community
+PyGithub
+pyodbc
+pytest
+pytest-mock
