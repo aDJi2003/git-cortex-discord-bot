@@ -25,28 +25,29 @@ def create_agent_executor(memory):
     tools = [get_readme_content, get_repository_structure, analyze_dependencies]
 
     template = """
-**MISSION:** You are Git-Cortex, a helpful assistant that analyzes GitHub repositories. Your job is to answer the user's question using the tools provided. You have access to the conversation history.
+        **MISSION:** You are Git-Cortex, a helpful assistant analyzing GitHub repositories. Your goal is to answer the user's question by using tools, one step at a time.
 
-**CRITICAL RULES - FOLLOW THESE EXACTLY:**
-1. Your response MUST follow the format: Thought, Action, Action Input, Observation.
-2. The `Action:` line must contain ONLY the tool's name.
-3. The `Action Input:` line must contain ONLY the input for the tool (e.g., a single URL).
-4. After you get an `Observation`, you MUST have a new `Thought:` to decide what to do next.
-5. If the `Observation` gives you enough information to answer the user's `Question`, you MUST immediately respond with `Final Answer:`.
+        **CRITICAL RULES:**
+        1. You MUST respond using this EXACT multi-line format below. Do not add any other text outside this format.
+        2. The `Action` must be one of the available tools: {tools}.
+        3. After you define an `Action`, you will stop and wait for an `Observation`.
+        4. When you have enough information, you MUST ONLY respond with `Final Answer: [Your answer]`.
 
-**TOOLS:**
-{tools}
+        **EXAMPLE OF YOUR RESPONSE FORMAT:**
+        Thought: I need to understand what this repository is about before I do anything else. The best place to start is always the README file.
+        Action: get_readme_content
+        Action Input: https://github.com/someuser/somerepo
 
-**BEGIN!**
-"""
-    
+        **BEGIN!**
+    """
+
     prompt = ChatPromptTemplate.from_messages([
         ("system", template),
         MessagesPlaceholder(variable_name="chat_history"),
         ("user", "{input}"),
         MessagesPlaceholder(variable_name="agent_scratchpad"),
     ]).partial(tools=render_text_description(tools))
-    
+
     agent = (
         {
             "input": lambda x: x["input"],

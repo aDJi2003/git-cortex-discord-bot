@@ -7,13 +7,12 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Konfigurasi koneksi dari file .env untuk MySQL
 DB_CONFIG = {
     'host': os.getenv("DB_SERVER"),
     'database': os.getenv("DB_DATABASE"),
     'user': os.getenv("DB_USER"),
     'password': os.getenv("DB_PASSWORD"),
-    'port': os.getenv("DB_PORT", 3306) # Gunakan port 3306 jika tidak dispesifikkan
+    'port': os.getenv("DB_PORT", 3306)
 }
 
 def get_db_connection():
@@ -33,7 +32,6 @@ def setup_database():
         
     try:
         cursor = conn.cursor()
-        # Syntax SQL diubah untuk MySQL
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS QueryCache (
                 ID INT AUTO_INCREMENT PRIMARY KEY,
@@ -66,7 +64,6 @@ def get_cached_response(query: str) -> str | None:
     response = None
     try:
         cursor = conn.cursor()
-        # Parameter di MySQL menggunakan %s, bukan ?
         cursor.execute("SELECT Response FROM QueryCache WHERE QueryHash = %s", (query_hash,))
         row = cursor.fetchone()
         if row:
@@ -89,7 +86,6 @@ def cache_response(query: str, response: str):
 
     try:
         cursor = conn.cursor()
-        # Parameter di MySQL menggunakan %s
         sql = "INSERT INTO QueryCache (QueryHash, FullQuery, Response) VALUES (%s, %s, %s)"
         val = (query_hash, query, response)
         cursor.execute(sql, val)
@@ -102,5 +98,4 @@ def cache_response(query: str, response: str):
             cursor.close()
             conn.close()
 
-# Jalankan setup saat aplikasi pertama kali dimulai
 setup_database()
