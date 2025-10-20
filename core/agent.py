@@ -4,7 +4,14 @@ from langchain.agents import AgentExecutor
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_groq import ChatGroq
 
-from core.tools import get_readme_content, get_repository_structure, analyze_dependencies
+from core.tools import (
+    get_readme_content, 
+    get_repository_structure, 
+    analyze_dependencies,
+    list_files_in_directory,
+    read_file_content,       
+    get_repo_languages       
+)
 
 from langchain.agents.output_parsers.react_single_input import ReActSingleInputOutputParser
 from langchain.agents.format_scratchpad import format_log_to_messages
@@ -22,7 +29,14 @@ def create_agent_executor(memory):
         temperature=0
     )
 
-    tools = [get_readme_content, get_repository_structure, analyze_dependencies]
+    tools = [
+        get_readme_content, 
+        get_repository_structure, 
+        analyze_dependencies,
+        list_files_in_directory,
+        read_file_content,
+        get_repo_languages
+    ]
 
     template = """
         **MISSION:** You are Git-Cortex, a helpful assistant analyzing GitHub repositories. Your goal is to answer the user's question by using tools, one step at a time.
