@@ -7,3 +7,4 @@ PyGithub
 pyodbc
 pytest
 pytest-mock
+reportlab
