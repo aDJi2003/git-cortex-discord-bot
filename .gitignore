@@ -4,3 +4,4 @@ core/utils/__pycache__/
 integrations/__pycache__/
 __pycache__
 venv/
+/outputs/
