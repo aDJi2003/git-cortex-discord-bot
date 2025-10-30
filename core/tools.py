@@ -4,8 +4,11 @@ from urllib.parse import urlparse
 import requests
 from typing import List, Optional
 from pydantic import BaseModel, Field
-
 from langchain_core.tools import BaseTool
+import requests
+from urllib.parse import urlparse
+from langchain.tools import tool
+# from core.tools import _normalize_repo_url, _api_contents_url, _github_api_headers
 
 from inspect import signature
 
@@ -232,6 +235,99 @@ def get_repo_languages(repo_url: str) -> str:
         return out
     except Exception as e:
         return f"Error saat mengambil bahasa repositori: {e}"
+
+
+import requests
+from urllib.parse import urlparse
+from langchain.tools import tool
+
+def _fetch_github_file(repo_path: str, file_path: str, branch="main"):
+    raw_url = f"https://raw.githubusercontent.com/{repo_path}/{branch}/{file_path}"
+    r = requests.get(raw_url, timeout=10)
+    return r.text if r.status_code == 200 else None
+
+
+def _list_all_files(repo_path: str, path: str = "", depth: int = 0, max_depth: int = 2):
+    if depth > max_depth:
+        return []
+    api_url = f"https://api.github.com/repos/{repo_path}/contents/{path}"
+    r = requests.get(api_url, headers=_github_api_headers(), timeout=15)
+    if r.status_code != 200:
+        return []
+    items = r.json()
+    structure = []
+    for item in items:
+        if item["type"] == "dir":
+            structure.append(f"{'  ' * depth}📁 {item['path']}/")
+            structure += _list_all_files(repo_path, item["path"], depth + 1)
+        else:
+            structure.append(f"{'  ' * depth}📄 {item['path']}")
+    return structure
+
+
+def analyze_repository_structure_with_explanation(repo_url: str, llm) -> str:
+    """
+    Ambil struktur repo lengkap dan jelaskan isi tiap file penting menggunakan LLM dari agent.py.
+    """
+    try:
+
+        repo_path = _normalize_repo_url(repo_url)
+        structure_lines = _list_all_files(repo_path)
+        structure_text = "\n".join(structure_lines[:40])
+
+        prompt = f"""
+        Berikut adalah struktur file dari repositori GitHub {repo_path}:
+
+        {structure_text}
+
+        Jelaskan secara singkat:
+        1. Tujuan utama proyek berdasarkan struktur ini.
+        2. Fungsi umum tiap file/folder utama.
+        3. Komponen penting yang tampak dari struktur tersebut.
+        """
+        explanation = llm.invoke(prompt).content
+
+        return f"{structure_text}\n\n🧠 Penjelasan Struktur:\n{explanation}"
+    except Exception as e:
+        return f"Error saat analisis struktur: {e}"
+
+
+def analyze_dependencies_with_explanation(repo_url: str, llm) -> str:
+    """
+    Ambil file dependensi (requirements.txt, pyproject.toml, package.json)
+    dan jelaskan fungsinya menggunakan LLM dari agent.py.
+    """
+    try:
+        repo_path = _normalize_repo_url(repo_url)
+        candidates = ["requirements.txt", "pyproject.toml", "package.json"]
+        found_file, content = None, None
+
+        for f in candidates:
+            c = _fetch_github_file(repo_path, f)
+            if c:
+                found_file, content = f, c
+                break
+
+        if not content:
+            return "Tidak ditemukan file dependensi umum (requirements.txt, package.json, pyproject.toml, dll.)"
+
+        prompt = f"""
+        Berikut adalah isi dari file {found_file} pada repo {repo_path}:
+
+        ```
+        {content}
+        ```
+
+        Tolong jelaskan:
+        1. Fungsi dari setiap dependensi.
+        2. Teknologi utama yang digunakan proyek ini.
+        3. Hubungan antar-dependensi (jika relevan).
+        """
+        explanation = llm.invoke(prompt).content
+
+        return f"📦 File dependensi terdeteksi: {found_file}\n\n🧩 Penjelasan:\n{explanation}"
+    except Exception as e:
+        return f"Error saat analisis dependensi: {e}"
 
 
 # -------------------------
