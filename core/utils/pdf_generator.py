@@ -8,7 +8,12 @@ from datetime import datetime
 import os
 
 @tool
-def generate_pdf_report(repo_url, summary_text, structure_text=None, dependencies_text=None):
+def generate_pdf_report(
+    repo_url: str = "Unknown",
+    summary_text: str = "No summary provided.",
+    structure_text: str = None,
+    dependencies_text: str = None
+):
     """
     Membuat laporan PDF hasil analisis repository GitHub.
     """

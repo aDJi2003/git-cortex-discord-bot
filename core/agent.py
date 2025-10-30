@@ -1,22 +1,27 @@
 import os
 from dotenv import load_dotenv
-from langchain.agents import initialize_agent, AgentType
-from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain_groq import ChatGroq
-from langchain.memory import ConversationSummaryMemory
-# from langchain.experimental.plan_and_execute import PlanAndExecute, load_agent_executor, load_chat_planner
-from langchain.agents.output_parsers.react_single_input import ReActSingleInputOutputParser
-from langchain.agents.format_scratchpad import format_log_to_messages
+from langchain.agents import create_react_agent
 from langchain.tools.render import render_text_description
-from core.tools import (
-    get_readme_content,
-    get_repository_structure,
-    analyze_dependencies,
-    list_files_in_directory,
-    read_file_content,
-    get_repo_languages
-)
+from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain.memory import ConversationSummaryMemory, ConversationBufferMemory, CombinedMemory
+from langchain_groq import ChatGroq
+from langchain.agents import AgentExecutor
+# from core.tools import (
+#     get_readme_content,
+#     get_repository_structure,
+#     analyze_dependencies,
+#     list_files_in_directory,
+#     read_file_content,
+#     get_repo_languages
+# )
 from core.utils.pdf_generator import generate_pdf_report
+from langchain.schema import AIMessage, HumanMessage
+from langchain.agents.output_parsers import ReActJsonSingleInputOutputParser
+from langchain.agents.format_scratchpad import format_log_to_messages
+from langchain_core.runnables import RunnableMap
+
+
+from core.tools import ALL_GITHUB_TOOLS
 
 load_dotenv()
 
@@ -24,27 +29,56 @@ def create_agent_executor(memory):
     """
     Fungsi ini sekarang menerima objek 'memory' untuk membuat agent yang kontekstual.
     """
-    llm = ChatGroq(
+    llm_base = ChatGroq(
         model_name="llama-3.1-8b-instant",
         groq_api_key=os.getenv("GROQ_API_KEY"),
         temperature=0
     )
-
-    tools = [
-        get_readme_content, 
-        get_repository_structure, 
-        analyze_dependencies,
-        list_files_in_directory,
-        read_file_content,
-        get_repo_languages
-    ]
+    llm = llm_base.bind(stop=["\nObservation:", "\nObservation"])
+    tools = ALL_GITHUB_TOOLS
     
-    if memory is None:
-        memory = ConversationSummaryMemory(
-        memory_key="chat_history",
-        llm=llm,
+    
+
+    buffer_memory = ConversationBufferMemory(
+        memory_key="chat_history",             
+        llm=llm_base,
         return_messages=True
     )
+
+
+    memory = buffer_memory
+
+
+    # Jika pengguna memang melewatkan parameter memory saat memanggil fungsi,
+    # gunakan combined_memory sebagai default
+    if memory is None:
+        memory = memory
+
+    def debug_memory_state(memory):
+        print("=== DEBUG MEMORY STATE ===")
+        print("Memory type:", type(memory))
+        if hasattr(memory, "memories"):
+            for i, m in enumerate(memory.memories):
+                try:
+                    print(f" Submemory[{i}] type: {type(m)}, memory_key: {getattr(m, 'memory_key', None)}, return_messages: {getattr(m, 'return_messages', None)}")
+                except Exception as e:
+                    print(f"  (error inspecting submemory[{i}]): {e}")
+        try:
+            values = memory.load_memory_variables({"input": "debug"})
+            print(" memory.load_memory_variables returned keys:", list(values.keys()))
+            for k, v in values.items():
+                print(f"  - key: {k}, type: {type(v)}")
+                if isinstance(v, list):
+                    print("    -> list length:", len(v))
+                    for j, el in enumerate(v[:5]):
+                        print(f"       [{j}] type: {type(el)}, repr: {repr(el)[:200]}")
+                else:
+                    print("    -> repr:", repr(v)[:400])
+        except Exception as e:
+            print(" memory.load_memory_variables() raised:", repr(e))
+        print("==========================")
+
+    debug_memory_state(memory)
 
 
     template = """
@@ -77,45 +111,52 @@ def create_agent_executor(memory):
 
     """
 
+    
+
+
     prompt = ChatPromptTemplate.from_messages([
         ("system", template),
         MessagesPlaceholder(variable_name="chat_history"),
         ("user", "{input}"),
-        MessagesPlaceholder(variable_name="agent_scratchpad"),
+        MessagesPlaceholder(variable_name="agent_scratchpad")
     ]).partial(tools=render_text_description(tools))
 
-    # agent = (
-    #     {
-    #         "input": lambda x: x["input"],
-    #         "agent_scratchpad": lambda x: format_log_to_messages(x["intermediate_steps"]),
-    #         "chat_history": lambda x: x["chat_history"],
-    #     }
-    #     | prompt
-    #     | llm.bind(stop=["\nObservation"])
-    #     | ReActSingleInputOutputParser()
-    # )
-    agent_chain = (
-        {
-            "input": lambda x: x["input"],
-            "agent_scratchpad": lambda x: format_log_to_messages(x["intermediate_steps"]),
-            "chat_history": lambda x: x["chat_history"],
-        }
-        | prompt
-        | llm.bind(stop=["\nObservation"])
-        | ReActSingleInputOutputParser()
-    )
+    # --- Build ReAct Agent Manually ---
+    from langchain.agents import initialize_agent, AgentType
+    
+    agent = RunnableMap({
+        "input": lambda x: x["input"],
+        "chat_history": lambda x: x.get("chat_history", []),
+        "agent_scratchpad": lambda x: format_log_to_messages(x.get("intermediate_steps", [])),
+    }) | prompt | llm_base | ReActJsonSingleInputOutputParser()
 
 
-    agent_executor = initialize_agent(
-        tools=tools,
-        llm=llm,
-        agent_type=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
+
+    agent_executor = AgentExecutor(
+        agent=agent,
+        tools=ALL_GITHUB_TOOLS,
         memory=memory,
         verbose=True,
         handle_parsing_errors=True,
         max_iterations=7
     )
-    return agent_executor
+#     agent_executor = AgentExecutor.from_agent_and_tools(
+#     agent=agent,
+#     tools=tools,
+#     memory=memory,
+#     verbose=True,
+#     handle_parsing_errors=True,
+#     max_iterations=7,
+#     # PENTING: konversi agent_scratchpad ke list of messages
+#     input_mapping={
+#         "input": lambda x: x.get("input"),
+#         "chat_history": lambda x: x.get("chat_history", []),
+#         "agent_scratchpad": lambda x: format_log_to_messages(x.get("intermediate_steps", [])),
+#     }
+# )
+
+
+    return agent_executor, llm_base
 
 def run_agent_and_generate_pdf(agent_executor, repo_url, question):
     """
@@ -124,7 +165,8 @@ def run_agent_and_generate_pdf(agent_executor, repo_url, question):
     """
     try:
         # Jalankan agent
-        result = agent_executor.invoke({"input": question})
+        full_input = f"Repository URL: {repo_url}\n\nUser Question: {question}"
+        result = agent_executor.invoke({"input": full_input})
         answer = result.get("output", "Tidak ada hasil analisis yang ditemukan.")
 
         # Generate PDF

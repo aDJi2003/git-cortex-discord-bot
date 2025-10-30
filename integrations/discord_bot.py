@@ -6,6 +6,7 @@ from core.agent import create_agent_executor
 from langchain.memory import ConversationSummaryMemory
 from core.agent import run_agent_and_generate_pdf
 # from core.agent import create_planning_agent
+import re
 
 
 load_dotenv()
@@ -50,6 +51,15 @@ async def on_message(message):
         if not question:
             await message.channel.send("Mohon berikan pertanyaan setelah memanggil saya.")
             return
+        
+        match = re.match(r'(https?://github\.com/[^\s]+)\s*(.*)', question)
+        if match:
+            repo_url = match.group(1).strip()
+            question = match.group(2).strip() or "Jelaskan tentang repositori ini."
+        else:
+            await message.channel.send("⚠️ Format salah. Harap tulis seperti:\n`!analyze https://github.com/user/repo Apa yang dilakukan proyek ini?`")
+            return
+
 
         channel_id = message.channel.id
 
@@ -60,12 +70,14 @@ async def on_message(message):
             #     memory_key="chat_history", 
             #     return_messages=True
             # )
+            agent_executor, llm = create_agent_executor(None)
+
             memory = ConversationSummaryMemory(
-                llm=create_agent_executor(None).llm,
+                llm=llm,
                 memory_key="chat_history",
                 return_messages=True
             )
-            conversations[channel_id] = create_agent_executor(memory)
+            conversations[channel_id] = agent_executor
 
         agent_executor = conversations[channel_id]
 
@@ -77,7 +89,7 @@ async def on_message(message):
                 # answer = response.get('output', "Maaf, saya tidak bisa menemukan jawaban.")
                 # await message.channel.send(answer)
                 answer, pdf_path = await client.loop.run_in_executor(
-                    None, run_agent_and_generate_pdf, agent_executor, question, question
+                    None, run_agent_and_generate_pdf, agent_executor, repo_url, question
                 )
                 await message.channel.send(answer)
 
