@@ -6,7 +6,20 @@ Git Cortex Bot adalah AI Agent cerdas yang dirancang untuk merangkum dan mengana
 
 Berikut adalah contoh interaksi dengan Git Cortex Bot di Discord. Bot akan menganalisis URL repositori yang diberikan dan memberikan ringkasan komprehensif.
 
-*(Catatan: Ganti file ini dengan GIF atau screenshot demo Anda sendiri di dalam folder `images`)*
+### Link GitHub Valid (Repo Public)
+![Demo Github Valid dan Repo Public](images/tes_1.png)
+
+### Link GitHub Valid (Repo Private)
+![Demo Github Valid dan Repo Private](images/tes_2.png)
+
+### Link GitHub Tidak Valid
+![Demo Link Github Tidak Valid](images/tes_3.png)
+
+### Repositori Tanpa File Readme
+![Demo Repositori Tanpa File Readme](images/tes_4.png)
+
+### Tes Fitur Menjelajahi Repositori
+![Demo Tes Fitur Menjelajahi Repositori](images/tes_5.png)
 
 ## Latar Belakang
 
@@ -72,11 +85,3 @@ Setelah semua konfigurasi selesai, jalankan bot (asumsikan file utamanya adalah 
 python main.py
 ```
 Jika tidak ada error, bot Anda akan online dan siap menerima perintah di server Discord Anda.
-
-## Cara Menggunakan
-Setelah bot ditambahkan ke server Discord Anda, Anda dapat berinteraksi dengannya menggunakan perintah slash (/).
-
-- `/summarize [repo_url]`: Memulai analisis pada repositori GitHub yang diberikan.
-- `... (Tambahkan perintah lain jika ada)`
-
-Bot akan merespons secara interaktif untuk memberikan informasi yang Anda butuhkan.
