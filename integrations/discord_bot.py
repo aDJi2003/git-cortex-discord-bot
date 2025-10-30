@@ -28,19 +28,6 @@ async def on_message(message):
     if message.author == client.user:
         return
     
-    # if message.content.startswith("!plan "):
-    #     question = message.content[len("!plan "):].strip()
-    #     agent = create_planning_agent()
-
-    #     async with message.channel.typing():
-    #         try:
-    #             result = await client.loop.run_in_executor(
-    #                 None, agent.run, question
-    #             )
-    #             await message.channel.send(f"🧠 **Planned Analysis Result:**\n{result}")
-    #         except Exception as e:
-    #             await message.channel.send(f"❌ Error in planning agent: {e}")
-
     if client.user.mentioned_in(message) or message.content.startswith('!analyze'):
         
         if message.content.startswith('!analyze '):
@@ -55,7 +42,9 @@ async def on_message(message):
         match = re.match(r'(https?://github\.com/[^\s]+)\s*(.*)', question)
         if match:
             repo_url = match.group(1).strip()
+            print(f"Repo URL diterima: {repo_url}")
             question = match.group(2).strip() or "Jelaskan tentang repositori ini."
+            print(f"Pertanyaan diterima: {question}")   
         else:
             await message.channel.send("⚠️ Format salah. Harap tulis seperti:\n`!analyze https://github.com/user/repo Apa yang dilakukan proyek ini?`")
             return
@@ -91,6 +80,7 @@ async def on_message(message):
                 answer, pdf_path = await client.loop.run_in_executor(
                     None, run_agent_and_generate_pdf, agent_executor, repo_url, question
                 )
+                print(f"answer for pdf", answer)
                 await message.channel.send(answer)
 
                 if pdf_path:

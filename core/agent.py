@@ -6,15 +6,8 @@ from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain.memory import ConversationSummaryMemory, ConversationBufferMemory, CombinedMemory
 from langchain_groq import ChatGroq
 from langchain.agents import AgentExecutor
-# from core.tools import (
-#     get_readme_content,
-#     get_repository_structure,
-#     analyze_dependencies,
-#     list_files_in_directory,
-#     read_file_content,
-#     get_repo_languages
-# )
 from core.utils.pdf_generator import generate_pdf_report
+from core.tools import get_repository_structure, analyze_dependencies
 from langchain.schema import AIMessage, HumanMessage
 from langchain.agents.output_parsers import ReActJsonSingleInputOutputParser
 from langchain.agents.format_scratchpad import format_log_to_messages
@@ -138,78 +131,53 @@ def create_agent_executor(memory):
         memory=memory,
         verbose=True,
         handle_parsing_errors=True,
-        max_iterations=7
+        max_iterations=100
     )
-#     agent_executor = AgentExecutor.from_agent_and_tools(
-#     agent=agent,
-#     tools=tools,
-#     memory=memory,
-#     verbose=True,
-#     handle_parsing_errors=True,
-#     max_iterations=7,
-#     # PENTING: konversi agent_scratchpad ke list of messages
-#     input_mapping={
-#         "input": lambda x: x.get("input"),
-#         "chat_history": lambda x: x.get("chat_history", []),
-#         "agent_scratchpad": lambda x: format_log_to_messages(x.get("intermediate_steps", [])),
-#     }
-# )
-
 
     return agent_executor, llm_base
 
+from core.tools import (
+    analyze_repository_structure_with_explanation,
+    analyze_dependencies_with_explanation,
+)
+
 def run_agent_and_generate_pdf(agent_executor, repo_url, question):
     """
-    Menjalankan agent, mengambil hasil analisis, dan otomatis membuat PDF report.
-    Mengembalikan tuple (answer, pdf_path).
+    Jalankan agent untuk menganalisis repo, dan hasilnya diubah menjadi PDF report lengkap.
     """
     try:
-        # Jalankan agent
         full_input = f"Repository URL: {repo_url}\n\nUser Question: {question}"
         result = agent_executor.invoke({"input": full_input})
         answer = result.get("output", "Tidak ada hasil analisis yang ditemukan.")
 
-        # Generate PDF
+        # Ambil LLM dari agent_executor (bisa disimpan di variabel global saat create_agent_executor)
+        llm = getattr(agent_executor, "llm", None)
+        if llm is None:
+            print("⚠️ WARNING: LLM tidak ditemukan di agent_executor. Pastikan create_agent_executor menyimpannya.")
+            llm = ChatGroq(
+                model_name="llama-3.1-8b-instant",
+                groq_api_key=os.getenv("GROQ_API_KEY"),
+                temperature=0
+            )
+
+        # Analisis tambahan
+        structure_text = analyze_repository_structure_with_explanation(repo_url, llm)
+        dependencies_text = analyze_dependencies_with_explanation(repo_url, llm)
+
+        # Debug info
+        print("DEBUG: repo_url =", repo_url)
+        print("DEBUG: summary_text =", answer)
+        print("DEBUG: structure_text =", structure_text)
+        print("DEBUG: dependencies_text =", dependencies_text)
+
         pdf_path = generate_pdf_report(
-            title="Git-Cortex Repository Analysis Report",
             repo_url=repo_url,
-            analysis_text=answer
+            summary_text=answer,
+            structure_text=structure_text,
+            dependencies_text=dependencies_text
         )
 
         return answer, pdf_path
 
     except Exception as e:
         return f"Terjadi error saat analisis: {e}", None
-
-# def create_planning_agent(memory):
-#     """Membuat agent dengan kemampuan planning dan reasoning otomatis"""
-#     llm = ChatGroq(
-#         model_name="llama-3.1-8b-instant",
-#         groq_api_key=os.getenv("GROQ_API_KEY"),
-#         temperature=0
-#     )
-
-#     tools = [
-#         get_readme_content,
-#         get_repository_structure,
-#         analyze_dependencies,
-#         list_files_in_directory,
-#         read_file_content,
-#         get_repo_languages
-#     ]
-
-#     if memory is None:
-#         memory = ConversationSummaryMemory(
-#         memory_key="chat_history",
-#         llm=llm,
-#         return_messages=True
-#     )
-
-
-
-#     # Gunakan LangChain experimental planner-executor pipeline
-#     planner = load_chat_planner(llm)
-#     executor = load_agent_executor(llm, tools, verbose=True)
-#     plan_and_execute = PlanAndExecute(planner=planner, executor=executor)
-
-#     return plan_and_execute

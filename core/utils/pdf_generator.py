@@ -3,14 +3,19 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_CENTER
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.units import inch
-from langchain.tools import tool
+from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.pdfbase import pdfmetrics
+from reportlab.lib.fonts import addMapping
 from datetime import datetime
 import os
 
-@tool
+pdfmetrics.registerFont(TTFont("DejaVuSans", "assets/fonts/DejaVuSans.ttf"))
+addMapping("DejaVuSans", 0, 0, "DejaVuSans")
+
+
 def generate_pdf_report(
-    repo_url: str = "Unknown",
-    summary_text: str = "No summary provided.",
+    repo_url: str ,
+    summary_text: str ,
     structure_text: str = None,
     dependencies_text: str = None
 ):
@@ -29,15 +34,23 @@ def generate_pdf_report(
     story = []
 
     # Gaya khusus
+    body_style = ParagraphStyle(
+    name="Body",
+    fontName="DejaVuSans",
+    fontSize=11,
+    leading=14,
+)
+
     title_style = ParagraphStyle(
         name="Title",
+        fontName="DejaVuSans",
         fontSize=18,
         alignment=TA_CENTER,
         spaceAfter=20,
-        leading=22
+        leading=22,
     )
+
     header_style = styles["Heading2"]
-    body_style = styles["BodyText"]
 
     # Tambahkan konten
     story.append(Paragraph("Git-Cortex Repository Analysis Report", title_style))
